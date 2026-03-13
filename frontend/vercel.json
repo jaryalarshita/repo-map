@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://your-vm-ip:3001/api/$1" }
+  ]
+}

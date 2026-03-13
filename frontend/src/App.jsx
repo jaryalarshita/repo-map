@@ -1,121 +1,93 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { AlertCircle } from 'lucide-react';
+import useStore, {
+  selectIsLoading,
+  selectError,
+  selectGraphData,
+} from './store/useStore';
 
-function App() {
-  const [count, setCount] = useState(0)
+import SearchBar from './components/SearchBar';
+import Graph3D from './components/Graph3D';
+import Sidebar from './components/Sidebar';
+import FileSearch from './components/FileSearch';
+import LoadingScreen from './components/LoadingScreen';
+
+// ─── ErrorOverlay (internal) ───────────────────────────────────
+
+/**
+ * Full-screen error card with contextual help based on HTTP status code.
+ */
+function ErrorOverlay({ error, onDismiss, hasGraph }) {
+  const hints = {
+    404: 'Make sure the repository is public and the URL is correct.',
+    429: 'GitHub rate limit hit. Wait 60 seconds and try again.',
+    413: 'Repository is too large. Try a smaller project first.',
+    500: 'Backend error. Make sure the server is running.',
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-base/90 backdrop-blur-sm">
+      <div className="glass glow-cyan w-full max-w-md mx-4 p-8 flex flex-col items-center gap-5 text-center">
+        <AlertCircle className="h-12 w-12 text-red-400" />
 
-      <div className="ticks"></div>
+        <h2 className="text-xl font-bold text-white">{error.message}</h2>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {hints[error.code] && (
+          <p className="text-sm text-gray-400">{hints[error.code]}</p>
+        )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onDismiss}
+            className="rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 px-5 py-2.5 text-sm font-semibold text-neon-cyan hover:bg-neon-cyan/20 transition-colors"
+          >
+            Try Again
+          </button>
+
+          {hasGraph && (
+            <button
+              onClick={onDismiss}
+              className="rounded-lg bg-white/5 border border-white/10 px-5 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/10 transition-colors"
+            >
+              Back to Graph
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default App
+// ─── App ───────────────────────────────────────────────────────
+
+export default function App() {
+  const isLoading = useStore(selectIsLoading);
+  const error = useStore(selectError);
+  const graphData = useStore(selectGraphData);
+  const clearError = useStore((s) => s.clearError);
+
+  const hasGraph = graphData.nodes.length > 0;
+
+  return (
+    <div className="w-screen h-screen bg-dark-base overflow-hidden relative">
+      {/* Always render graph if data exists so it doesn't unmount */}
+      {hasGraph && (
+        <>
+          <Graph3D />
+          <FileSearch />
+          <Sidebar />
+        </>
+      )}
+
+      {/* Overlay states — sit on top of the graph */}
+      {!hasGraph && !isLoading && !error && <SearchBar />}
+      {isLoading && <LoadingScreen />}
+      {error && (
+        <ErrorOverlay
+          error={error}
+          onDismiss={clearError}
+          hasGraph={hasGraph}
+        />
+      )}
+    </div>
+  );
+}

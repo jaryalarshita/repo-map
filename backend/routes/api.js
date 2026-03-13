@@ -39,6 +39,49 @@ router.get('/analyze/ping', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/analyze/stream — SSE Stream: Download → Parse → Return (real-time)
+// ---------------------------------------------------------------------------
+// Query: ?url=https://github.com/owner/repo
+// Sends Server-Sent Events: progress, result, error
+router.get('/analyze/stream', async (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Helper to send SSE events
+  const send = (event, data) =>
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  let zipPath = null;
+  let extractedDir = null;
+
+  try {
+    const githubUrl = req.query.url;
+    if (!githubUrl) {
+      send('error', { code: 400, message: 'URL required' });
+      return res.end();
+    }
+
+    send('progress', { message: 'Connecting to GitHub...' });
+    const downloadResult = await githubService.downloadAndExtract(githubUrl);
+    zipPath = downloadResult.zipPath;
+    extractedDir = downloadResult.extractedDir;
+
+    send('progress', { message: 'Parsing dependencies...' });
+    const graphData = await parserService.runParser(extractedDir);
+
+    send('progress', { message: 'Building 3D graph...' });
+    send('result', graphData);
+  } catch (err) {
+    send('error', { code: err.code || 500, message: err.message });
+  } finally {
+    res.end();
+    parserService.cleanupFiles(zipPath, extractedDir);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/analyze — Full Pipeline: Download → Parse → Cleanup → Return
 // ---------------------------------------------------------------------------
 // Request body: { "url": "https://github.com/owner/repo" }
