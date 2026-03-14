@@ -147,3 +147,21 @@ export async function getFileSummary(filePath) {
     throw new Error(error.message || 'Failed to fetch file summary');
   }
 }
+
+/**
+ * Fetch the raw source code of a file from the last analyzed repo.
+ *
+ * @param {string} filePath — repo-relative file path (e.g. "src/utils/auth.js")
+ * @returns {Promise<{ content: string, lineCount: number, language: string }>}
+ */
+export async function getFileContent(filePath) {
+  try {
+    const res = await axios.get(`${BASE_URL}/api/file-content`, {
+      params: { path: filePath },
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response?.status === 404) throw new Error('File not found');
+    throw new Error(error.message || 'Failed to fetch file content');
+  }
+}

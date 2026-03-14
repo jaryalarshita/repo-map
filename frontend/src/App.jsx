@@ -10,12 +10,10 @@ import Graph3D from './components/Graph3D';
 import Sidebar from './components/Sidebar';
 import FileSearch from './components/FileSearch';
 import LoadingScreen from './components/LoadingScreen';
+import ControlPanel from './components/ControlPanel';
 
 // ─── ErrorOverlay (internal) ───────────────────────────────────
 
-/**
- * Full-screen error card with contextual help based on HTTP status code.
- */
 function ErrorOverlay({ error, onDismiss, hasGraph }) {
   const hints = {
     404: 'Make sure the repository is public and the URL is correct.',
@@ -28,13 +26,10 @@ function ErrorOverlay({ error, onDismiss, hasGraph }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-base/90 backdrop-blur-sm">
       <div className="glass glow-cyan w-full max-w-md mx-4 p-8 flex flex-col items-center gap-5 text-center">
         <AlertCircle className="h-12 w-12 text-red-400" />
-
         <h2 className="text-xl font-bold text-white">{error.message}</h2>
-
         {hints[error.code] && (
           <p className="text-sm text-gray-400">{hints[error.code]}</p>
         )}
-
         <div className="flex gap-3 mt-2">
           <button
             onClick={onDismiss}
@@ -42,7 +37,6 @@ function ErrorOverlay({ error, onDismiss, hasGraph }) {
           >
             Try Again
           </button>
-
           {hasGraph && (
             <button
               onClick={onDismiss}
@@ -75,6 +69,7 @@ export default function App() {
           <Graph3D />
           <FileSearch />
           <Sidebar />
+          <ControlPanel />
         </>
       )}
 

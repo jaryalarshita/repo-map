@@ -4,186 +4,177 @@ import * as THREE from 'three';
 import useStore, {
   selectGraphData,
   selectCameraTarget,
+  selectSearchHighlight,
+  selectExpandedNodes,
 } from '../store/useStore';
 
-/**
- * Return a hex colour based on a file's extension.
- * @param {string} name — file name or path
- */
-function colorForFile(name = '') {
-  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
-  if (['.js', '.jsx', '.ts', '.tsx'].includes(ext)) return 0x00f5ff; // cyan
-  if (ext === '.py') return 0x39ff14; // green
-  if (['.cpp', '.h', '.hpp'].includes(ext)) return 0xff6b00; // orange
-  return 0xaaaaaa; // grey
+// ── Color palette ───────────────────────────────────────────────────────────
+const COLORS = {
+  frontend: '#4A90E2',
+  backend:  '#FF6B6B',
+  folder:   '#FFC857',
+  config:   '#9B59B6',
+  file:     '#2ECC71',
+  linkImport: '#74B9FF',
+  linkDefault: '#BDC3C7',
+};
+
+function nodeColor(node) {
+  if (node.type === 'folder') return COLORS.folder;
+  if (node.group === 'frontend') return COLORS.frontend;
+  if (node.group === 'backend') return COLORS.backend;
+  if (node.group === 'config') return COLORS.config;
+  return COLORS.file;
 }
 
-/**
- * Build a glowing‑circle canvas texture for sprite‑based nodes.
- * Drawn once, then reused via THREE.CanvasTexture.
- */
-function createGlowTexture() {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
+// ── Shared geometry/materials (created once, reused everywhere) ─────────
+const sphereGeo = new THREE.SphereGeometry(1, 8, 8);
+const icoGeo = new THREE.IcosahedronGeometry(1, 0);
 
-  const gradient = ctx.createRadialGradient(
-    size / 2, size / 2, 0,
-    size / 2, size / 2, size / 2,
-  );
-  gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.3, 'rgba(0,245,255,0.8)');
-  gradient.addColorStop(1, 'rgba(0,245,255,0)');
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  return new THREE.CanvasTexture(canvas);
+// Material cache to avoid creating one per node
+const matCache = new Map();
+function getCachedMaterial(hexColor, wireframe = false, opacity = 1) {
+  const key = `${hexColor}-${wireframe}-${opacity}`;
+  if (!matCache.has(key)) {
+    matCache.set(key, new THREE.MeshBasicMaterial({
+      color: hexColor,
+      wireframe,
+      transparent: opacity < 1,
+      opacity,
+    }));
+  }
+  return matCache.get(key);
 }
 
-/**
- * Core 3D force‑directed graph visualisation.
- *
- * Uses `react-force-graph-3d` with:
- * - Level‑of‑detail rendering (sprites for small graphs, meshes for large)
- * - Smooth camera fly‑to via `cameraTarget` from Zustand
- * - Dynamic canvas sizing via ResizeObserver
- */
+// ── Component ───────────────────────────────────────────────────────────────
 export default function Graph3D() {
   const graphRef = useRef();
   const containerRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
-  // ── Zustand state ──
   const graphData = useStore(selectGraphData);
   const cameraTarget = useStore(selectCameraTarget);
   const selectedNode = useStore((s) => s.selectedNode);
   const setSelectedNode = useStore((s) => s.setSelectedNode);
+  const toggleExpand = useStore((s) => s.toggleExpand);
+  const expandedNodes = useStore(selectExpandedNodes);
+  const searchHighlight = useStore(selectSearchHighlight);
 
-  // ── LOD flag ──
-  const isLargeGraph = (graphData?.nodes?.length || 0) > 2000;
+  const nodeCount = graphData?.nodes?.length || 0;
+  const isLarge = nodeCount > 500;
 
-  // ── Glow texture (created once) ──
-  const glowTexture = useMemo(() => createGlowTexture(), []);
+  // Memoize graph data reference to avoid unnecessary re-renders
+  const stableGraphData = useMemo(() => {
+    if (!graphData?.nodes?.length) return { nodes: [], links: [] };
+    return graphData;
+  }, [graphData]);
 
-  // ── Sphere geometry (created once for reuse) ──
-  const sphereGeometry = useMemo(() => new THREE.SphereGeometry(3, 6, 6), []);
-
-  // ── Sprite material (created once for reuse, but cloned per node) ──
-  const baseSpriteMaterial = useMemo(() => new THREE.SpriteMaterial({
-    map: glowTexture,
-    transparent: true,
-    depthWrite: false,
-  }), [glowTexture]);
-
-  // ── Node rendering callback ──
+  // Node rendering — use simple meshes, reuse geometry + materials
   const nodeThreeObject = useCallback(
     (node) => {
-      if (!isLargeGraph) {
-        // Sprite‑based glowing orb
-        const sprite = new THREE.Sprite(baseSpriteMaterial.clone());
-        const s = node.size || 10;
-        sprite.scale.set(s, s, 1);
-        return sprite;
+      const color = nodeColor(node);
+
+      if (node.type === 'folder') {
+        const isExp = expandedNodes.has(node.id);
+        const s = Math.min((node.childCount || 3) > 10 ? 8 : 5, 8);
+        const mat = getCachedMaterial(color, true, isExp ? 0.4 : 0.85);
+        const mesh = new THREE.Mesh(icoGeo, mat);
+        mesh.scale.set(s, s, s);
+        return mesh;
       }
 
-      // Mesh‑based sphere (reusing geometry)
-      const material = new THREE.MeshBasicMaterial({
-        color: colorForFile(node.label || node.id || ''),
-      });
-
-      const mesh = new THREE.Mesh(sphereGeometry, material);
-
-      // Scale it if it has a custom size instead of creating new geometry
-      if (node.size && node.size !== 3) {
-        const scale = node.size / 3;
-        mesh.scale.set(scale, scale, scale);
-      }
-
+      // File node — simple sphere
+      const s = Math.max(2, Math.min(node.size || 5, 15));
+      const mat = getCachedMaterial(color, false, 0.9);
+      const mesh = new THREE.Mesh(sphereGeo, mat);
+      mesh.scale.set(s, s, s);
       return mesh;
     },
-    [isLargeGraph, baseSpriteMaterial, sphereGeometry],
+    [expandedNodes],
   );
 
-  // ── Manual node highlighting ──
-  useEffect(() => {
-    if (!graphData?.nodes) return;
-    graphData.nodes.forEach((node) => {
-      const isSelected = selectedNode && node.id === selectedNode.id;
-      const obj = node.__threeObj;
-      if (obj && obj.material) {
-        if (!isLargeGraph) {
-          obj.material.color.setHex(isSelected ? 0xff0000 : 0xffffff);
-        } else {
-          obj.material.color.setHex(isSelected ? 0xff0000 : colorForFile(node.label || node.id || ''));
-        }
+  // Node click
+  const handleNodeClick = useCallback(
+    (node) => {
+      if (node.type === 'folder') {
+        toggleExpand(node.id);
+      } else {
+        setSelectedNode(node);
+        useStore.getState().focusNode(node);
       }
-    });
+    },
+    [toggleExpand, setSelectedNode],
+  );
 
-    // We also trigger a layout refresh just in case, though material mutation is synchronous
-    if (graphRef.current) {
-      // Refresh to ensure any internal re-draws capture the material change
-      // ForceGraph actually doesn't strictly need this for material color changes
-      // but it's safe.
-    }
-  }, [selectedNode, graphData.nodes, isLargeGraph]);
-
-  // ── Camera fly‑to ──
+  // Camera fly-to
   useEffect(() => {
     if (cameraTarget && graphRef.current) {
       graphRef.current.cameraPosition(
-        {
-          x: cameraTarget.x,
-          y: cameraTarget.y + 100,
-          z: cameraTarget.z + 200,
-        },
-        cameraTarget, // lookAt
-        1500,         // transition ms
+        { x: cameraTarget.x, y: cameraTarget.y + 80, z: cameraTarget.z + 150 },
+        cameraTarget,
+        1200,
       );
     }
   }, [cameraTarget]);
 
-  // ── Dynamic canvas resizing ──
+  // D3 forces
+  useEffect(() => {
+    if (graphRef.current) {
+      graphRef.current.d3Force('charge')?.strength(isLarge ? -80 : -150);
+      graphRef.current.d3Force('link')?.distance(isLarge ? 30 : 50);
+    }
+  }, [stableGraphData, isLarge]);
+
+  // Resize
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (width && height) setDimensions({ width, height });
     });
-
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Link color function
+  const getLinkColor = useCallback((link) => {
+    return link.type === 'import' ? COLORS.linkImport : COLORS.linkDefault;
+  }, []);
+
+  // Node label function
+  const getNodeLabel = useCallback((node) => {
+    if (node.type === 'folder') {
+      const exp = expandedNodes.has(node.id);
+      return `📁 ${node.label} (${node.childCount || 0})${exp ? '' : ' ▶ click to expand'}`;
+    }
+    return `${node.label}${node.lineCount ? ` • ${node.lineCount} lines` : ''} [${node.group}]`;
+  }, [expandedNodes]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
       <ForceGraph3D
         ref={graphRef}
-        graphData={graphData || { nodes: [], links: [] }}
+        graphData={stableGraphData}
         width={dimensions.width}
         height={dimensions.height}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
-        nodeColor={(node) =>
-          selectedNode && node.id === selectedNode.id ? "#ff0000" : undefined
-        }
-        onNodeClick={(node) => {
-          setSelectedNode(node);
-          useStore.getState().focusNode(node); // Or bring in focusNode from useStore hook
-        }}
-        linkColor={() => 'rgba(0,245,255,0.4)'}
-        linkOpacity={0.4}
-        linkWidth={1.5}
+        onNodeClick={handleNodeClick}
+        nodeLabel={getNodeLabel}
+        linkColor={getLinkColor}
+        linkOpacity={0.5}
+        linkWidth={isLarge ? 1 : 2}
+        linkDirectionalParticles={isLarge ? 0 : 2}
+        linkDirectionalParticleSpeed={0.003}
+        linkDirectionalParticleWidth={1.5}
         backgroundColor="#0a0e1a"
-        nodeLabel={(node) => node.label || node.id || ''}
-        cooldownTicks={100}
-        warmupTicks={50}
-        d3AlphaDecay={0.02}
+        cooldownTicks={isLarge ? 50 : 100}
+        warmupTicks={isLarge ? 20 : 50}
+        d3AlphaDecay={isLarge ? 0.05 : 0.02}
         d3VelocityDecay={0.3}
+        enableNodeDrag={!isLarge}
+        nodeRelSize={1}
       />
     </div>
   );
