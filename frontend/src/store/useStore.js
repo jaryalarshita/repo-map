@@ -16,16 +16,6 @@ function buildVisibleGraph(raw, expandedNodes, activeFilter) {
     }
   }
 
-  // For filtering: collect all file node IDs that match the filter
-  const matchingFileIds = new Set();
-  if (activeFilter !== 'all') {
-    for (const n of raw.nodes) {
-      if (n.type === 'file' && n.group === activeFilter) {
-        matchingFileIds.add(n.id);
-      }
-    }
-  }
-
   // Determine which nodes are visible via expansion state
   const visible = new Set();
   visible.add('__root__');
@@ -36,7 +26,7 @@ function buildVisibleGraph(raw, expandedNodes, activeFilter) {
       // Apply group filter — for folders, check if ANY descendant file matches
       if (activeFilter !== 'all') {
         if (n.type === 'file' && n.group !== activeFilter) continue;
-        if (n.type === 'folder' && !hasMachingDescendant(n.id)) continue;
+        if (n.type === 'folder' && !hasMatchingDescendant(n.id)) continue;
       }
 
       visible.add(n.id);
@@ -48,12 +38,12 @@ function buildVisibleGraph(raw, expandedNodes, activeFilter) {
   }
 
   // Check if a folder has any descendant file matching the filter
-  function hasMachingDescendant(folderId) {
+  function hasMatchingDescendant(folderId) {
     if (activeFilter === 'all') return true;
     const children = childrenOf.get(folderId) || [];
     for (const c of children) {
       if (c.type === 'file' && c.group === activeFilter) return true;
-      if (c.type === 'folder' && hasMachingDescendant(c.id)) return true;
+      if (c.type === 'folder' && hasMatchingDescendant(c.id)) return true;
     }
     return false;
   }
@@ -89,14 +79,9 @@ const useStore = create((set, get) => ({
   rawGraphData: { nodes: [], links: [] },
   graphData: { nodes: [], links: [] },
 
-<<<<<<< HEAD
-=======
   /** The GitHub URL of the currently analyzed repository. */
   githubUrl: '',
 
-  // ─── UI State ──────────────────────────────────────────────────
-  /** The node object the user last clicked; `null` when no node is selected (sidebar closed). */
->>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
   selectedNode: null,
   isLoading: false,
   loadingMessage: '',
@@ -131,22 +116,9 @@ const useStore = create((set, get) => ({
     });
   },
 
-<<<<<<< HEAD
-  setSelectedNode: (node) => set({ selectedNode: node, fileContent: null, fileContentLoading: false }),
-=======
-  /**
-   * Set the GitHub URL of the currently analyzed repository.
-   * @param {string} url
-   */
   setGithubUrl: (url) => set({ githubUrl: url }),
 
-  /**
-   * Set (or clear) the currently selected node.
-   * Pass `null` to deselect and close the detail sidebar.
-   * @param {object|null} node
-   */
-  setSelectedNode: (node) => set({ selectedNode: node }),
->>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
+  setSelectedNode: (node) => set({ selectedNode: node, fileContent: null, fileContentLoading: false }),
 
   setLoading: (bool, message = '') =>
     set({ isLoading: bool, loadingMessage: message }),
@@ -216,7 +188,7 @@ const useStore = create((set, get) => ({
 
 export default useStore;
 
-<<<<<<< HEAD
+// ─── Selector Functions ────────────────────────────────────────
 export const selectGraphData = (s) => s.graphData;
 export const selectRawGraphData = (s) => s.rawGraphData;
 export const selectSelectedNode = (s) => s.selectedNode;
@@ -226,25 +198,4 @@ export const selectCameraTarget = (s) => s.cameraTarget;
 export const selectActiveFilter = (s) => s.activeFilter;
 export const selectExpandedNodes = (s) => s.expandedNodes;
 export const selectSearchHighlight = (s) => s.searchHighlight;
-=======
-// ─── Selector Functions ────────────────────────────────────────
-// Use these with `useStore(selectXxx)` for minimal re-renders.
-
-/** @returns {{ nodes: Array, links: Array }} */
-export const selectGraphData = (state) => state.graphData;
-
-/** @returns {object|null} */
-export const selectSelectedNode = (state) => state.selectedNode;
-
-/** @returns {boolean} */
-export const selectIsLoading = (state) => state.isLoading;
-
-/** @returns {{ code: number, message: string }|null} */
-export const selectError = (state) => state.error;
-
-/** @returns {{ x: number, y: number, z: number }|null} */
-export const selectCameraTarget = (state) => state.cameraTarget;
-
-/** @returns {string} */
-export const selectGithubUrl = (state) => state.githubUrl;
->>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
+export const selectGithubUrl = (s) => s.githubUrl;

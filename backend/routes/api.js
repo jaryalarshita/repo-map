@@ -119,7 +119,6 @@ router.post('/analyze', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // ── GET /api/file-content — Raw source code of a file ───────────────────────
 // Query: ?path=src/components/App.jsx  (relative path from repo root)
 // Returns: { content: "...", lineCount: 42, language: "jsx" }
@@ -163,49 +162,28 @@ router.get('/file-content', (req, res) => {
   }
 });
 
-// ── GET /api/summary — AI Summary ───────────────────────────────────────────
-router.get('/summary', async (req, res) => {
-  const filePath = req.query.path;
-=======
-// ---------------------------------------------------------------------------
-// GET /api/summary — On-Demand AI Summary for a Single File
-// ---------------------------------------------------------------------------
-// Query: ?path=/absolute/path/to/file.js&url=https://github.com/owner/repo
+// ── GET /api/summary — On-Demand AI Summary ─────────────────────────────────
+// Query: ?path=src/utils/auth.js
 // Response: { "summary": "This file does X. It handles Y." }
 //
 // ⚠️ FRONTEND RULE: Only call this when a user CLICKS a node.
 //    Never pre-fetch summaries for all nodes — that exhausts the API.
 router.get('/summary', async (req, res) => {
   const filePath = req.query.path;
-  const githubUrl = req.query.url;
 
->>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
   if (!filePath) {
     return res.status(400).json({ error: 'path query parameter is required' });
   }
 
-<<<<<<< HEAD
-  // Try to read from the last extracted repo
+  // Try to read from the last extracted repo first
   let fileContent;
   if (lastExtractedDir) {
     const resolved = path.resolve(lastExtractedDir, filePath);
     if (resolved.startsWith(path.resolve(lastExtractedDir))) {
       try {
         fileContent = fs.readFileSync(resolved, 'utf-8');
-      } catch { /* fall through */ }
+      } catch { /* fall through to fallback */ }
     }
-=======
-  if (!githubUrl) {
-    return res.status(400).json({ error: 'url query parameter is required' });
-  }
-
-  // Read the file content from GitHub directly (since local repo is cleaned up)
-  let fileContent;
-  try {
-    fileContent = await githubService.fetchFileContent(githubUrl, filePath);
-  } catch (err) {
-    return res.status(404).json({ error: err.message });
->>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
   }
 
   // Fallback to absolute path
