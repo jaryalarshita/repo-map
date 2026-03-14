@@ -59,39 +59,52 @@ export default function Graph3D() {
   // ── Zustand state ──
   const graphData = useStore(selectGraphData);
   const cameraTarget = useStore(selectCameraTarget);
+  const selectedNode = useStore((s) => s.selectedNode);
   const setSelectedNode = useStore((s) => s.setSelectedNode);
 
   // ── LOD flag ──
-  const isLargeGraph = graphData.nodes.length > 2000;
+  const isLargeGraph = (graphData?.nodes?.length || 0) > 2000;
 
   // ── Glow texture (created once) ──
   const glowTexture = useMemo(() => createGlowTexture(), []);
+
+  // ── Sphere geometry (created once for reuse) ──
+  const sphereGeometry = useMemo(() => new THREE.SphereGeometry(3, 6, 6), []);
+
+  // ── Sprite material (created once for reuse) ──
+  const spriteMaterial = useMemo(() => new THREE.SpriteMaterial({
+    map: glowTexture,
+    transparent: true,
+    depthWrite: false,
+  }), [glowTexture]);
 
   // ── Node rendering callback ──
   const nodeThreeObject = useCallback(
     (node) => {
       if (!isLargeGraph) {
         // Sprite‑based glowing orb
-        const material = new THREE.SpriteMaterial({
-          map: glowTexture,
-          transparent: true,
-          depthWrite: false,
-        });
-        const sprite = new THREE.Sprite(material);
+        const sprite = new THREE.Sprite(spriteMaterial);
         const s = node.size || 10;
         sprite.scale.set(s, s, 1);
         return sprite;
       }
 
-      // Mesh‑based sphere (cheaper for large graphs)
-      const radius = node.size || 3;
-      const geometry = new THREE.SphereGeometry(radius, 6, 6);
+      // Mesh‑based sphere (reusing geometry)
       const material = new THREE.MeshBasicMaterial({
         color: colorForFile(node.label || node.id || ''),
       });
-      return new THREE.Mesh(geometry, material);
+
+      const mesh = new THREE.Mesh(sphereGeometry, material);
+
+      // Scale it if it has a custom size instead of creating new geometry
+      if (node.size && node.size !== 3) {
+        const scale = node.size / 3;
+        mesh.scale.set(scale, scale, scale);
+      }
+
+      return mesh;
     },
-    [isLargeGraph, glowTexture],
+    [isLargeGraph, spriteMaterial, sphereGeometry],
   );
 
   // ── Camera fly‑to ──
@@ -127,16 +140,24 @@ export default function Graph3D() {
     <div ref={containerRef} className="w-full h-full">
       <ForceGraph3D
         ref={graphRef}
-        graphData={graphData}
+        graphData={graphData || { nodes: [], links: [] }}
         width={dimensions.width}
         height={dimensions.height}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
+        nodeColor={(node) =>
+          selectedNode && node.id === selectedNode.id ? "#ff0000" : undefined
+        }
         onNodeClick={(node) => setSelectedNode(node)}
         linkColor={() => 'rgba(0,245,255,0.2)'}
+        linkOpacity={0.2}
         linkWidth={0.5}
         backgroundColor="#0a0e1a"
-        nodeLabel={(node) => node.label}
+        nodeLabel={(node) => node.label || node.id || ''}
+        cooldownTicks={100}
+        warmupTicks={50}
+        d3AlphaDecay={0.02}
+        d3VelocityDecay={0.3}
       />
     </div>
   );
