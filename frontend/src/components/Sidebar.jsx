@@ -19,16 +19,22 @@ export default function Sidebar() {
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  // ── Fetch AI summary when selected node changes ──
+  // ── Clear summary when no node selected ──
   useEffect(() => {
     if (!selectedNode?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSummary(null);
-      return;
+      setSummaryLoading(false);
     }
+  }, [selectedNode?.id]);
+
+  // ── Fetch AI summary when selected node changes ──
+  useEffect(() => {
+    if (!selectedNode?.id) return;
 
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSummaryLoading(true);
-    setSummary(null);
 
     getFileSummary(selectedNode.id)
       .then((text) => {
@@ -56,12 +62,6 @@ export default function Sidebar() {
   const importedBy = graphData.links.filter(
     (l) => (typeof l.target === 'object' ? l.target.id : l.target) === selectedNode?.id,
   );
-
-  /** Resolve a link endpoint (could be an id string or an object). */
-  const resolveNode = (endpoint) => {
-    const id = typeof endpoint === 'object' ? endpoint.id : endpoint;
-    return graphData.nodes.find((n) => n.id === id);
-  };
 
   /** Extract just the filename from a path. */
   const basename = (path = '') => path.split('/').pop();

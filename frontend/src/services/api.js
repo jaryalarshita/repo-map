@@ -99,7 +99,7 @@ export async function analyzeRepo(githubUrl, onProgress = () => {}) {
       try {
         const data = JSON.parse(e.data);
         resolve(data);
-      } catch (err) {
+      } catch {
         reject({ code: 500, message: 'Failed to parse analysis result.' });
       }
     });
@@ -115,7 +115,7 @@ export async function analyzeRepo(githubUrl, onProgress = () => {}) {
     });
 
     // Native EventSource error (connection lost, etc.)
-    eventSource.onerror = (err) => {
+    eventSource.onerror = () => {
       // Ignore error if connection was already closed after result
       if (eventSource.readyState === EventSource.CLOSED) return;
 

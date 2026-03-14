@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import * as THREE from 'three';
 import useStore, {
@@ -65,10 +65,7 @@ export default function Graph3D() {
   const isLargeGraph = graphData.nodes.length > 2000;
 
   // ── Glow texture (created once) ──
-  const glowTexture = useRef(null);
-  if (!glowTexture.current) {
-    glowTexture.current = createGlowTexture();
-  }
+  const glowTexture = useMemo(() => createGlowTexture(), []);
 
   // ── Node rendering callback ──
   const nodeThreeObject = useCallback(
@@ -76,7 +73,7 @@ export default function Graph3D() {
       if (!isLargeGraph) {
         // Sprite‑based glowing orb
         const material = new THREE.SpriteMaterial({
-          map: glowTexture.current,
+          map: glowTexture,
           transparent: true,
           depthWrite: false,
         });
@@ -94,7 +91,7 @@ export default function Graph3D() {
       });
       return new THREE.Mesh(geometry, material);
     },
-    [isLargeGraph],
+    [isLargeGraph, glowTexture],
   );
 
   // ── Camera fly‑to ──

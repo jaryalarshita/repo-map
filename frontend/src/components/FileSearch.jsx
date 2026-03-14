@@ -18,13 +18,18 @@ export default function FileSearch() {
   const focusNode = useStore((s) => s.focusNode);
   const setSelectedNode = useStore((s) => s.setSelectedNode);
 
-  // ── Debounced filter (300 ms) ──
+  // ── Clear when query empty ──
   useEffect(() => {
     if (!query.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       setIsOpen(false);
-      return;
     }
+  }, [query]);
+
+  // ── Debounced filter (300 ms) ──
+  useEffect(() => {
+    if (!query.trim()) return;
 
     const timer = setTimeout(() => {
       const q = query.toLowerCase();
