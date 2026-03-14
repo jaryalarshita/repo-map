@@ -163,24 +163,29 @@ router.post('/analyze', async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/summary — On-Demand AI Summary for a Single File
 // ---------------------------------------------------------------------------
-// Query: ?path=/absolute/path/to/file.js
+// Query: ?path=/absolute/path/to/file.js&url=https://github.com/owner/repo
 // Response: { "summary": "This file does X. It handles Y." }
 //
 // ⚠️ FRONTEND RULE: Only call this when a user CLICKS a node.
 //    Never pre-fetch summaries for all nodes — that exhausts the API.
 router.get('/summary', async (req, res) => {
   const filePath = req.query.path;
+  const githubUrl = req.query.url;
 
   if (!filePath) {
     return res.status(400).json({ error: 'path query parameter is required' });
   }
 
-  // Read the file content
+  if (!githubUrl) {
+    return res.status(400).json({ error: 'url query parameter is required' });
+  }
+
+  // Read the file content from GitHub directly (since local repo is cleaned up)
   let fileContent;
   try {
-    fileContent = fs.readFileSync(filePath, 'utf-8');
+    fileContent = await githubService.fetchFileContent(githubUrl, filePath);
   } catch (err) {
-    return res.status(404).json({ error: `File not found: ${filePath}` });
+    return res.status(404).json({ error: err.message });
   }
 
   // Generate the AI summary (never throws — always returns a string)

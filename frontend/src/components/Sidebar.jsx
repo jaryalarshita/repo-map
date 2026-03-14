@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import useStore, { selectGraphData, selectSelectedNode } from '../store/useStore';
+import useStore, { selectGraphData, selectSelectedNode, selectGithubUrl } from '../store/useStore';
 import { getFileSummary } from '../services/api';
 
 /**
@@ -12,6 +12,7 @@ import { getFileSummary } from '../services/api';
 export default function Sidebar() {
   const selectedNode = useStore(selectSelectedNode);
   const graphData = useStore(selectGraphData);
+  const githubUrl = useStore(selectGithubUrl);
   const setSelectedNode = useStore((s) => s.setSelectedNode);
   const focusNode = useStore((s) => s.focusNode);
 
@@ -36,7 +37,13 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSummaryLoading(true);
 
-    getFileSummary(selectedNode.id)
+    if (!githubUrl) {
+      setSummary('Summary unavailable: Missing GitHub URL');
+      setSummaryLoading(false);
+      return;
+    }
+
+    getFileSummary(selectedNode.id, githubUrl)
       .then((text) => {
         if (!cancelled) {
           setSummary(text);

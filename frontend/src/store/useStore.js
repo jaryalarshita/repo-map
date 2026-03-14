@@ -11,6 +11,9 @@ const useStore = create((set) => ({
   /** The force-graph payload — `{ nodes: [...], links: [...] }` returned by the API. */
   graphData: { nodes: [], links: [] },
 
+  /** The GitHub URL of the currently analyzed repository. */
+  githubUrl: '',
+
   // ─── UI State ──────────────────────────────────────────────────
   /** The node object the user last clicked; `null` when no node is selected (sidebar closed). */
   selectedNode: null,
@@ -40,6 +43,12 @@ const useStore = create((set) => ({
    */
   setGraphData: (data) =>
     set({ graphData: data, isLoading: false, loadingMessage: '', error: null }),
+
+  /**
+   * Set the GitHub URL of the currently analyzed repository.
+   * @param {string} url
+   */
+  setGithubUrl: (url) => set({ githubUrl: url }),
 
   /**
    * Set (or clear) the currently selected node.
@@ -103,3 +112,6 @@ export const selectError = (state) => state.error;
 
 /** @returns {{ x: number, y: number, z: number }|null} */
 export const selectCameraTarget = (state) => state.cameraTarget;
+
+/** @returns {string} */
+export const selectGithubUrl = (state) => state.githubUrl;
