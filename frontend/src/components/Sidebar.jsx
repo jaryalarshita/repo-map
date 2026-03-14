@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+<<<<<<< HEAD
 import { X, FileCode, Folder, ArrowUpRight, ArrowDownLeft, Code2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import useStore, { selectGraphData, selectSelectedNode } from '../store/useStore';
 import { getFileSummary, getFileContent } from '../services/api';
@@ -9,10 +10,16 @@ const GROUP_COLORS = {
   config:   { bg: 'bg-purple-400/15', text: 'text-purple-400', border: 'border-purple-400/30', color: '#9B59B6' },
   shared:   { bg: 'bg-green-400/15', text: 'text-green-400', border: 'border-green-400/30', color: '#2ECC71' },
 };
+=======
+import { X } from 'lucide-react';
+import useStore, { selectGraphData, selectSelectedNode, selectGithubUrl } from '../store/useStore';
+import { getFileSummary } from '../services/api';
+>>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
 
 export default function Sidebar() {
   const selectedNode = useStore(selectSelectedNode);
   const graphData = useStore(selectGraphData);
+  const githubUrl = useStore(selectGithubUrl);
   const setSelectedNode = useStore((s) => s.setSelectedNode);
   const focusNode = useStore((s) => s.focusNode);
   const toggleExpand = useStore((s) => s.toggleExpand);
@@ -45,11 +52,34 @@ export default function Sidebar() {
     if (!selectedNode?.id || selectedNode?.type === 'folder') return;
     let cancelled = false;
     setSummaryLoading(true);
+<<<<<<< HEAD
     getFileSummary(selectedNode.id)
       .then((text) => { if (!cancelled) { setSummary(text); setSummaryLoading(false); } })
       .catch(() => { if (!cancelled) { setSummary('Summary unavailable'); setSummaryLoading(false); } });
     return () => { cancelled = true; };
   }, [selectedNode?.id, selectedNode?.type]);
+=======
+
+    if (!githubUrl) {
+      setSummary('Summary unavailable: Missing GitHub URL');
+      setSummaryLoading(false);
+      return;
+    }
+
+    getFileSummary(selectedNode.id, githubUrl)
+      .then((text) => {
+        if (!cancelled) {
+          setSummary(text);
+          setSummaryLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummary('Summary unavailable');
+          setSummaryLoading(false);
+        }
+      });
+>>>>>>> ce38c7999bf903e4266ddd529e44dcfb7313437f
 
   // Fetch file content when code tab selected
   useEffect(() => {

@@ -17,6 +17,7 @@ export default function SearchBar() {
   const setLoading = useStore((state) => state.setLoading);
   const setGraphData = useStore((state) => state.setGraphData);
   const setError = useStore((state) => state.setError);
+  const setGithubUrl = useStore((state) => state.setGithubUrl);
 
   /** Validate & kick off analysis. */
   const handleSubmit = async (e) => {
@@ -33,8 +34,10 @@ export default function SearchBar() {
 
     try {
       setLoading(true, 'Connecting to GitHub…');
+      const cleanUrl = url.trim();
+      setGithubUrl(cleanUrl);
 
-      const data = await analyzeRepo(url.trim(), (msg) =>
+      const data = await analyzeRepo(cleanUrl, (msg) =>
         setLoading(true, msg),
       );
 

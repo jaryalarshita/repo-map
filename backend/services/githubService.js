@@ -117,4 +117,46 @@ async function downloadAndExtract(githubUrl) {
   };
 }
 
-module.exports = { downloadAndExtract };
+/**
+ * Fetches the raw text content of a single file directly from GitHub's REST API.
+ * 
+ * @param {string} githubUrl - Full GitHub URL, e.g. "https://github.com/facebook/react"
+ * @param {string} filePath - Path to the file inside the repo, e.g. "packages/react/index.js"
+ * @returns {Promise<string>} The raw text content of the file
+ */
+async function fetchFileContent(githubUrl, filePath) {
+  const urlObj = new URL(githubUrl);
+  const pathParts = urlObj.pathname.split('/').filter(Boolean);
+
+  if (pathParts.length < 2) {
+    throw new Error('Invalid GitHub URL.');
+  }
+
+  const owner = pathParts[0];
+  let repo = pathParts[1];
+  if (repo.endsWith('.git')) {
+    repo = repo.slice(0, -4);
+  }
+
+  try {
+    const response = await axios.get(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
+      {
+        headers: {
+          'User-Agent': 'CodebaseMap-Hackathon',
+          'Accept': 'application/vnd.github.v3.raw'
+        },
+        responseType: 'text',
+        transformResponse: [(data) => data] // Prevent axios from auto-parsing JSON
+      }
+    );
+    return response.data;
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      throw new Error(`File not found on GitHub: ${filePath}`);
+    }
+    throw new Error(`Failed to fetch file content from GitHub: ${err.message}`);
+  }
+}
+
+module.exports = { downloadAndExtract, fetchFileContent };

@@ -30,6 +30,7 @@ async function generateSummary(fileContent, filePath) {
   // Step 1: Check for API key
   // -------------------------------------------------------------------------
   const apiKey = process.env.DEEPMIND_API_KEY;
+  console.log('DEBUG API KEY:', apiKey);
 
   if (!apiKey || apiKey === 'your_key_here') {
     return 'Summary unavailable: API key not configured. Set DEEPMIND_API_KEY in .env';
@@ -42,9 +43,9 @@ async function generateSummary(fileContent, filePath) {
   // We initialize it here (not at module level) so it picks up env changes.
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  // gemini-1.5-flash: fast, cheap, perfect for hackathon summaries.
-  // gemini-1.5-pro is smarter but slower and more expensive.
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  // gemini-2.5-flash: fast, cheap, perfect for hackathon summaries.
+  // gemini-2.5-pro is smarter but slower and more expensive.
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   // -------------------------------------------------------------------------
   // Step 3: Build the prompt

@@ -130,12 +130,13 @@ export async function analyzeRepo(githubUrl, onProgress = () => {}) {
  * Fetch an AI-generated summary for a single file.
  *
  * @param {string} filePath — repo-relative file path (e.g. "src/utils/auth.js")
+ * @param {string} githubUrl — full GitHub repository URL
  * @returns {Promise<string>} — plain-text summary
  */
-export async function getFileSummary(filePath) {
+export async function getFileSummary(filePath, githubUrl) {
   try {
     const res = await axios.get(`${BASE_URL}/api/summary`, {
-      params: { path: filePath },
+      params: { path: filePath, url: githubUrl },
     });
     return res.data.summary;
   } catch (error) {
