@@ -149,9 +149,9 @@ export default function Graph3D() {
           selectedNode && node.id === selectedNode.id ? "#ff0000" : undefined
         }
         onNodeClick={(node) => setSelectedNode(node)}
-        linkColor={() => 'rgba(0,245,255,0.2)'}
-        linkOpacity={0.2}
-        linkWidth={0.5}
+        linkColor={() => 'rgba(0,245,255,0.4)'}
+        linkOpacity={0.4}
+        linkWidth={1.5}
         backgroundColor="#0a0e1a"
         nodeLabel={(node) => node.label || node.id || ''}
         cooldownTicks={100}

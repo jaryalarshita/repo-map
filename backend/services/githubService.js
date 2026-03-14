@@ -40,20 +40,23 @@ async function downloadAndExtract(githubUrl) {
   }
 
   const owner = pathParts[0];
-  const repo = pathParts[1];
+  let repo = pathParts[1];
+  if (repo.endsWith('.git')) {
+    repo = repo.slice(0, -4);
+  }
 
   console.log(`[GitHub] Downloading ${owner}/${repo}...`);
 
   // -------------------------------------------------------------------------
   // Step 2: Download the ZIP archive from GitHub
   // -------------------------------------------------------------------------
-  // GitHub's zipball API: GET /repos/{owner}/{repo}/zipball/{branch}
-  // We try "main" first, then fall back to "master" for older repos.
+  // GitHub's zipball API: GET /repos/{owner}/{repo}/zipball
+  // If no branch is provided, GitHub returns the zipball for the default branch (main/master).
   // responseType: 'arraybuffer' tells axios to keep raw bytes (ZIP is binary).
   let response;
   try {
     response = await axios.get(
-      `https://api.github.com/repos/${owner}/${repo}/zipball/main`,
+      `https://api.github.com/repos/${owner}/${repo}/zipball`,
       {
         responseType: 'arraybuffer',
         headers: {
@@ -64,30 +67,10 @@ async function downloadAndExtract(githubUrl) {
       }
     );
   } catch (err) {
-    // If "main" branch doesn't exist, try "master" (older repos use master)
     if (err.response && err.response.status === 404) {
-      console.log('[GitHub] "main" branch not found, trying "master"...');
-      try {
-        response = await axios.get(
-          `https://api.github.com/repos/${owner}/${repo}/zipball/master`,
-          {
-            responseType: 'arraybuffer',
-            headers: {
-              'User-Agent': 'CodebaseMap-Hackathon',
-              'Accept': 'application/vnd.github+json'
-            },
-            maxRedirects: 5
-          }
-        );
-      } catch (err2) {
-        if (err2.response && err2.response.status === 404) {
-          throw new Error('Repository not found or is private');
-        }
-        throw new Error(`GitHub download failed: ${err2.message}`);
-      }
-    } else {
-      throw new Error(`GitHub download failed: ${err.message}`);
+      throw new Error('Repository not found or is private');
     }
+    throw new Error(`GitHub download failed: ${err.message}`);
   }
 
   // -------------------------------------------------------------------------
