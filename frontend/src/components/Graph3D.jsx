@@ -71,8 +71,8 @@ export default function Graph3D() {
   // ── Sphere geometry (created once for reuse) ──
   const sphereGeometry = useMemo(() => new THREE.SphereGeometry(3, 6, 6), []);
 
-  // ── Sprite material (created once for reuse) ──
-  const spriteMaterial = useMemo(() => new THREE.SpriteMaterial({
+  // ── Sprite material (created once for reuse, but cloned per node) ──
+  const baseSpriteMaterial = useMemo(() => new THREE.SpriteMaterial({
     map: glowTexture,
     transparent: true,
     depthWrite: false,
@@ -83,7 +83,7 @@ export default function Graph3D() {
     (node) => {
       if (!isLargeGraph) {
         // Sprite‑based glowing orb
-        const sprite = new THREE.Sprite(spriteMaterial);
+        const sprite = new THREE.Sprite(baseSpriteMaterial.clone());
         const s = node.size || 10;
         sprite.scale.set(s, s, 1);
         return sprite;
@@ -104,8 +104,31 @@ export default function Graph3D() {
 
       return mesh;
     },
-    [isLargeGraph, spriteMaterial, sphereGeometry],
+    [isLargeGraph, baseSpriteMaterial, sphereGeometry],
   );
+
+  // ── Manual node highlighting ──
+  useEffect(() => {
+    if (!graphData?.nodes) return;
+    graphData.nodes.forEach((node) => {
+      const isSelected = selectedNode && node.id === selectedNode.id;
+      const obj = node.__threeObj;
+      if (obj && obj.material) {
+        if (!isLargeGraph) {
+          obj.material.color.setHex(isSelected ? 0xff0000 : 0xffffff);
+        } else {
+          obj.material.color.setHex(isSelected ? 0xff0000 : colorForFile(node.label || node.id || ''));
+        }
+      }
+    });
+
+    // We also trigger a layout refresh just in case, though material mutation is synchronous
+    if (graphRef.current) {
+      // Refresh to ensure any internal re-draws capture the material change
+      // ForceGraph actually doesn't strictly need this for material color changes
+      // but it's safe.
+    }
+  }, [selectedNode, graphData.nodes, isLargeGraph]);
 
   // ── Camera fly‑to ──
   useEffect(() => {
@@ -148,7 +171,10 @@ export default function Graph3D() {
         nodeColor={(node) =>
           selectedNode && node.id === selectedNode.id ? "#ff0000" : undefined
         }
-        onNodeClick={(node) => setSelectedNode(node)}
+        onNodeClick={(node) => {
+          setSelectedNode(node);
+          useStore.getState().focusNode(node); // Or bring in focusNode from useStore hook
+        }}
         linkColor={() => 'rgba(0,245,255,0.4)'}
         linkOpacity={0.4}
         linkWidth={1.5}
