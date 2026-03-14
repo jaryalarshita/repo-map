@@ -115,10 +115,14 @@ export async function analyzeRepo(githubUrl, onProgress = () => {}) {
     });
 
     // Native EventSource error (connection lost, etc.)
-    eventSource.onerror = () => {
+    eventSource.onerror = (err) => {
+      // Ignore error if connection was already closed after result
+      if (eventSource.readyState === EventSource.CLOSED) return;
+
       close();
       reject({ code: 0, message: 'Lost connection to the server.' });
     };
+
   });
 }
 
