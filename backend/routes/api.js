@@ -63,6 +63,16 @@ router.get('/analyze/stream', async (req, res) => {
       return res.end();
     }
 
+    if (!githubUrl.startsWith('https://github.com/')) {
+      send('error', { code: 400, message: 'URL must start with https://github.com/' });
+      return res.end();
+    }
+
+    // Flush headers to establish SSE connection immediately
+    if (res.flushHeaders) {
+      res.flushHeaders();
+    }
+
     send('progress', { message: 'Connecting to GitHub...' });
     const downloadResult = await githubService.downloadAndExtract(githubUrl);
     zipPath = downloadResult.zipPath;

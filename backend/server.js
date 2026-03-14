@@ -41,8 +41,14 @@ app.use('/api', apiRoutes);
 
 const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
   console.log(`   Health check: http://localhost:${PORT}/api/analyze/ping`);
-  console.log(`   Analyze:      POST http://localhost:${PORT}/api/analyze\n`);
+  console.log(`   Analyze:      POST http://localhost:${PORT}/api/analyze`);
+  console.log(`   Stream:       GET  http://localhost:${PORT}/api/analyze/stream\n`);
 });
+
+// For SSE: increase timeouts to prevent Node from dropping the connection
+// during long GitHub ZIP downloads
+server.keepAliveTimeout = 120000; 
+server.headersTimeout = 120000;
