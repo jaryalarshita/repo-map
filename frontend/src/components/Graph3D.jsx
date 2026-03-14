@@ -1,10 +1,8 @@
-import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
-import * as THREE from 'three';
 import useStore, {
   selectGraphData,
   selectCameraTarget,
-  selectSearchHighlight,
   selectExpandedNodes,
 } from '../store/useStore';
 
@@ -19,7 +17,7 @@ const COLORS = {
   linkDefault: '#BDC3C7',
 };
 
-function nodeColor(node) {
+function getNodeColor(node) {
   if (node.type === 'folder') return COLORS.folder;
   if (node.group === 'frontend') return COLORS.frontend;
   if (node.group === 'backend') return COLORS.backend;
@@ -27,73 +25,54 @@ function nodeColor(node) {
   return COLORS.file;
 }
 
-// ── Shared geometry/materials (created once, reused everywhere) ─────────
-const sphereGeo = new THREE.SphereGeometry(1, 8, 8);
-const icoGeo = new THREE.IcosahedronGeometry(1, 0);
-
-// Material cache to avoid creating one per node
-const matCache = new Map();
-function getCachedMaterial(hexColor, wireframe = false, opacity = 1) {
-  const key = `${hexColor}-${wireframe}-${opacity}`;
-  if (!matCache.has(key)) {
-    matCache.set(key, new THREE.MeshBasicMaterial({
-      color: hexColor,
-      wireframe,
-      transparent: opacity < 1,
-      opacity,
-    }));
-  }
-  return matCache.get(key);
-}
-
-// ── Component ───────────────────────────────────────────────────────────────
 export default function Graph3D() {
   const graphRef = useRef();
   const containerRef = useRef();
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [dimensions, setDimensions] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
 
   const graphData = useStore(selectGraphData);
   const cameraTarget = useStore(selectCameraTarget);
-  const selectedNode = useStore((s) => s.selectedNode);
-  const setSelectedNode = useStore((s) => s.setSelectedNode);
   const toggleExpand = useStore((s) => s.toggleExpand);
+  const setSelectedNode = useStore((s) => s.setSelectedNode);
   const expandedNodes = useStore(selectExpandedNodes);
-  const searchHighlight = useStore(selectSearchHighlight);
 
-  const nodeCount = graphData?.nodes?.length || 0;
-  const isLarge = nodeCount > 500;
+  // Handle Resize
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setDimensions({ width, height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  // Memoize graph data reference to avoid unnecessary re-renders
-  const stableGraphData = useMemo(() => {
-    if (!graphData?.nodes?.length) return { nodes: [], links: [] };
-    return graphData;
+  // Handle Camera Fly-To
+  useEffect(() => {
+    if (cameraTarget && graphRef.current) {
+      graphRef.current.cameraPosition(
+        { x: cameraTarget.x, y: cameraTarget.y + 100, z: cameraTarget.z + 150 },
+        cameraTarget,
+        1000,
+      );
+    }
+  }, [cameraTarget]);
+
+  // Handle auto-fit on data change (debounced slightly to let physics settle)
+  useEffect(() => {
+    if (graphRef.current && graphData?.nodes?.length > 0) {
+      const timer = setTimeout(() => {
+        graphRef.current.zoomToFit(600, 50);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
   }, [graphData]);
 
-  // Node rendering — use simple meshes, reuse geometry + materials
-  const nodeThreeObject = useCallback(
-    (node) => {
-      const color = nodeColor(node);
-
-      if (node.type === 'folder') {
-        const isExp = expandedNodes.has(node.id);
-        const s = Math.min((node.childCount || 3) > 10 ? 8 : 5, 8);
-        const mat = getCachedMaterial(color, true, isExp ? 0.4 : 0.85);
-        const mesh = new THREE.Mesh(icoGeo, mat);
-        mesh.scale.set(s, s, s);
-        return mesh;
-      }
-
-      // File node — simple sphere
-      const s = Math.max(2, Math.min(node.size || 5, 15));
-      const mat = getCachedMaterial(color, false, 0.9);
-      const mesh = new THREE.Mesh(sphereGeo, mat);
-      mesh.scale.set(s, s, s);
-      return mesh;
-    },
-    [expandedNodes],
-  );
-
-  // Node click
+  // Callbacks
   const handleNodeClick = useCallback(
     (node) => {
       if (node.type === 'folder') {
@@ -103,46 +82,14 @@ export default function Graph3D() {
         useStore.getState().focusNode(node);
       }
     },
-    [toggleExpand, setSelectedNode],
+    [toggleExpand, setSelectedNode]
   );
-
-  // Camera fly-to
-  useEffect(() => {
-    if (cameraTarget && graphRef.current) {
-      graphRef.current.cameraPosition(
-        { x: cameraTarget.x, y: cameraTarget.y + 80, z: cameraTarget.z + 150 },
-        cameraTarget,
-        1200,
-      );
-    }
-  }, [cameraTarget]);
-
-  // D3 forces
-  useEffect(() => {
-    if (graphRef.current) {
-      graphRef.current.d3Force('charge')?.strength(isLarge ? -80 : -150);
-      graphRef.current.d3Force('link')?.distance(isLarge ? 30 : 50);
-    }
-  }, [stableGraphData, isLarge]);
-
-  // Resize
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width && height) setDimensions({ width, height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
+  
+  const nodeValFn = useCallback((node) => {
+    if (node.type === 'folder') return 8;
+    return Math.max(3, Math.min(node.size || 4, 10));
   }, []);
 
-  // Link color function
-  const getLinkColor = useCallback((link) => {
-    return link.type === 'import' ? COLORS.linkImport : COLORS.linkDefault;
-  }, []);
-
-  // Node label function
   const getNodeLabel = useCallback((node) => {
     if (node.type === 'folder') {
       const exp = expandedNodes.has(node.id);
@@ -151,30 +98,28 @@ export default function Graph3D() {
     return `${node.label}${node.lineCount ? ` • ${node.lineCount} lines` : ''} [${node.group}]`;
   }, [expandedNodes]);
 
+  const getLinkColor = useCallback((link) => {
+    return link.type === 'import' ? COLORS.linkImport : COLORS.linkDefault;
+  }, []);
+
+  const isLarge = (graphData?.nodes?.length || 0) > 300;
+
   return (
-    <div ref={containerRef} className="w-full h-full">
+    <div ref={containerRef} className="w-full h-full" style={{ position: 'absolute', inset: 0 }}>
       <ForceGraph3D
         ref={graphRef}
-        graphData={stableGraphData}
+        graphData={graphData}
         width={dimensions.width}
         height={dimensions.height}
-        nodeThreeObject={nodeThreeObject}
-        nodeThreeObjectExtend={false}
-        onNodeClick={handleNodeClick}
+        nodeColor={getNodeColor}
+        nodeVal={nodeValFn}
+        nodeRelSize={5}
         nodeLabel={getNodeLabel}
         linkColor={getLinkColor}
-        linkOpacity={0.5}
-        linkWidth={isLarge ? 1 : 2}
-        linkDirectionalParticles={isLarge ? 0 : 2}
-        linkDirectionalParticleSpeed={0.003}
-        linkDirectionalParticleWidth={1.5}
+        linkOpacity={0.6}
+        linkWidth={isLarge ? 0.5 : 1}
+        onNodeClick={handleNodeClick}
         backgroundColor="#0a0e1a"
-        cooldownTicks={isLarge ? 50 : 100}
-        warmupTicks={isLarge ? 20 : 50}
-        d3AlphaDecay={isLarge ? 0.05 : 0.02}
-        d3VelocityDecay={0.3}
-        enableNodeDrag={!isLarge}
-        nodeRelSize={1}
       />
     </div>
   );

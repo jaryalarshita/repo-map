@@ -50,14 +50,24 @@ function buildVisibleGraph(raw, expandedNodes, activeFilter) {
 
   addChildrenOf('__root__');
 
-  const visibleNodes = raw.nodes.filter(n => visible.has(n.id));
+  // Clone nodes so react-force-graph-3d sees fresh objects on every
+  // filter/expand change (the library mutates nodes in-place with x,y,z).
+  const visibleNodes = raw.nodes
+    .filter(n => visible.has(n.id))
+    .map(n => ({ ...n }));
 
   // Only include links where both source and target are visible
-  const visibleLinks = raw.links.filter(l => {
-    const sid = typeof l.source === 'object' ? l.source.id : l.source;
-    const tid = typeof l.target === 'object' ? l.target.id : l.target;
-    return visible.has(sid) && visible.has(tid);
-  });
+  const visibleLinks = raw.links
+    .filter(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return visible.has(sid) && visible.has(tid);
+    })
+    .map(l => ({
+      source: typeof l.source === 'object' ? l.source.id : l.source,
+      target: typeof l.target === 'object' ? l.target.id : l.target,
+      type: l.type,
+    }));
 
   return { nodes: visibleNodes, links: visibleLinks };
 }
