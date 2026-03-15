@@ -11,8 +11,40 @@ import Sidebar from './components/Sidebar';
 import FileSearch from './components/FileSearch';
 import LoadingScreen from './components/LoadingScreen';
 import ControlPanel from './components/ControlPanel';
+import FileExplorer from './components/FileExplorer';
+import React from 'react';
 
-// ─── ErrorOverlay (internal) ───────────────────────────────────
+// ─── Error Boundary (Global) ───────────────────────────────────
+class GlobalErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("Global Error Boundary caught:", error, info);
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-screen h-screen bg-red-900 text-white p-10 font-mono flex flex-col items-center justify-center text-left">
+          <h1 className="text-2xl font-bold mb-4">Application Crashed</h1>
+          <pre className="bg-black/50 p-4 rounded overflow-auto w-full max-w-4xl text-sm whitespace-pre-wrap text-red-300">
+            {this.state.error && this.state.error.toString()}
+            <br/>
+            {this.state.info && this.state.info.componentStack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── ErrorOverlay (internal API error) ─────────────────────────
 
 function ErrorOverlay({ error, onDismiss, hasGraph }) {
   const hints = {
@@ -62,14 +94,18 @@ export default function App() {
   const hasGraph = graphData.nodes.length > 0;
 
   return (
-    <div className="w-screen h-screen bg-dark-base overflow-hidden relative">
-      {/* Always render graph if data exists so it doesn't unmount */}
+    <GlobalErrorBoundary>
+      <div className="w-screen h-screen bg-dark-base overflow-hidden relative">
+        {/* Always render graph if data exists so it doesn't unmount */}
       {hasGraph && (
         <>
-          <Graph3D />
-          <FileSearch />
+          <FileExplorer />
+          <div className="ml-72 w-[calc(100%-18rem)] h-full relative">
+            <Graph3D />
+            <FileSearch />
+            <ControlPanel />
+          </div>
           <Sidebar />
-          <ControlPanel />
         </>
       )}
 
@@ -84,5 +120,6 @@ export default function App() {
         />
       )}
     </div>
+    </GlobalErrorBoundary>
   );
 }

@@ -1,9 +1,10 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import useStore, {
   selectGraphData,
   selectCameraTarget,
   selectExpandedNodes,
+  selectSelectedNode,
 } from '../store/useStore';
 
 // ── Color palette ───────────────────────────────────────────────────────────
@@ -15,15 +16,9 @@ const COLORS = {
   file:     '#2ECC71',
   linkImport: '#74B9FF',
   linkDefault: '#BDC3C7',
+  dimmedNode: '#1a2436',
+  dimmedLink: 'rgba(26, 36, 54, 0.2)',
 };
-
-function getNodeColor(node) {
-  if (node.type === 'folder') return COLORS.folder;
-  if (node.group === 'frontend') return COLORS.frontend;
-  if (node.group === 'backend') return COLORS.backend;
-  if (node.group === 'config') return COLORS.config;
-  return COLORS.file;
-}
 
 export default function Graph3D() {
   const graphRef = useRef();
@@ -36,8 +31,34 @@ export default function Graph3D() {
   const graphData = useStore(selectGraphData);
   const cameraTarget = useStore(selectCameraTarget);
   const toggleExpand = useStore((s) => s.toggleExpand);
+  const selectedNode = useStore(selectSelectedNode);
   const setSelectedNode = useStore((s) => s.setSelectedNode);
   const expandedNodes = useStore(selectExpandedNodes);
+
+  // Calculate connected nodes & links for highlighting
+  const { connectedNodeIds, connectedLinks } = useMemo(() => {
+    const nIds = new Set();
+    const lSet = new Set();
+    if (!selectedNode || selectedNode.type === 'folder' || !graphData?.links) {
+      return { connectedNodeIds: nIds, connectedLinks: lSet };
+    }
+
+    nIds.add(selectedNode.id);
+    
+    graphData.links.forEach((link) => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      
+      if (sourceId === selectedNode.id) {
+        nIds.add(targetId);
+        lSet.add(link);
+      } else if (targetId === selectedNode.id) {
+        nIds.add(sourceId);
+        lSet.add(link);
+      }
+    });
+    return { connectedNodeIds: nIds, connectedLinks: lSet };
+  }, [selectedNode, graphData]);
 
   // Handle Resize
   useEffect(() => {
@@ -98,11 +119,43 @@ export default function Graph3D() {
     return `${node.label}${node.lineCount ? ` • ${node.lineCount} lines` : ''} [${node.group}]`;
   }, [expandedNodes]);
 
+  const getNodeColor = useCallback((node) => {
+    let baseColor;
+    if (node.type === 'folder') baseColor = COLORS.folder;
+    else if (node.group === 'frontend') baseColor = COLORS.frontend;
+    else if (node.group === 'backend') baseColor = COLORS.backend;
+    else if (node.group === 'config') baseColor = COLORS.config;
+    else baseColor = COLORS.file;
+
+    // Dim non-connected nodes if a file is selected
+    if (selectedNode && selectedNode.type === 'file') {
+      if (!connectedNodeIds.has(node.id)) {
+        return COLORS.dimmedNode;
+      }
+    }
+    return baseColor;
+  }, [selectedNode, connectedNodeIds]);
+
   const getLinkColor = useCallback((link) => {
-    return link.type === 'import' ? COLORS.linkImport : COLORS.linkDefault;
-  }, []);
+    const baseColor = link.type === 'import' ? COLORS.linkImport : COLORS.linkDefault;
+    if (selectedNode && selectedNode.type === 'file') {
+      if (!connectedLinks.has(link)) {
+        return COLORS.dimmedLink;
+      }
+      return '#00f5ff'; // Bright cyan for highlighted connections
+    }
+    return baseColor;
+  }, [selectedNode, connectedLinks]);
 
   const isLarge = (graphData?.nodes?.length || 0) > 300;
+
+  const getLinkWidth = useCallback((link) => {
+    const baseWidth = isLarge ? 0.3 : 1;
+    if (selectedNode && selectedNode.type === 'file' && connectedLinks.has(link)) {
+      return baseWidth * 3;
+    }
+    return baseWidth;
+  }, [isLarge, selectedNode, connectedLinks]);
 
   return (
     <div ref={containerRef} className="w-full h-full" style={{ position: 'absolute', inset: 0 }}>
@@ -116,8 +169,8 @@ export default function Graph3D() {
         nodeRelSize={5}
         nodeLabel={getNodeLabel}
         linkColor={getLinkColor}
-        linkOpacity={0.6}
-        linkWidth={isLarge ? 0.5 : 1}
+        linkOpacity={selectedNode?.type === 'file' ? 0.9 : 0.6}
+        linkWidth={getLinkWidth}
         onNodeClick={handleNodeClick}
         backgroundColor="#0a0e1a"
       />

@@ -31,13 +31,31 @@ export default function ControlPanel() {
   const resetLayout = useStore((s) => s.resetLayout);
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-3" style={{ maxWidth: 260 }}>
-      {/* ── Filter pills ── */}
-      <div className="glass p-3 flex flex-col gap-2">
-        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1 flex items-center gap-1">
+    <div className="fixed bottom-6 left-[300px] z-50 flex items-end gap-4">
+      {/* ── Legend ── */}
+      <div className="glass p-3 min-w-[200px]">
+        <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-2">
+          Legend
+        </p>
+        <div className="grid grid-cols-2 gap-y-2 gap-x-2">
+          {LEGEND.map((item) => (
+            <div key={item.label} className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: item.color, boxShadow: `0 0 6px ${item.color}60` }}
+              />
+              <span className="text-[11px] text-gray-300">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Filter pills (exact right of legends) ── */}
+      <div className="glass p-3 flex flex-col gap-2 min-w-[240px]">
+        <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1 flex items-center gap-1">
           <Layers className="h-3 w-3" /> Filter
         </p>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {FILTERS.map((f) => (
             <button
               key={f.key}
@@ -54,46 +72,33 @@ export default function ControlPanel() {
         </div>
       </div>
 
-      {/* ── Actions ── */}
-      <div className="glass p-3 flex gap-1.5">
-        <button
-          onClick={expandAll}
-          className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-          title="Expand all folders"
-        >
-          <Maximize2 className="h-3 w-3" /> Expand
-        </button>
-        <button
-          onClick={collapseAll}
-          className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-          title="Collapse all folders"
-        >
-          <Minimize2 className="h-3 w-3" /> Collapse
-        </button>
-        <button
-          onClick={resetLayout}
-          className="flex items-center justify-center gap-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-          title="Reset graph layout"
-        >
-          <RotateCcw className="h-3 w-3" />
-        </button>
-      </div>
-
-      {/* ── Legend ── */}
-      <div className="glass p-3">
-        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-2">
-          Legend
+      {/* ── Actions (Expand/Collapse/Reset) so it does not overlap ── */}
+      <div className="glass p-3 flex flex-col gap-2">
+        <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+          Graph Actions
         </p>
-        <div className="grid grid-cols-2 gap-y-1 gap-x-3">
-          {LEGEND.map((item) => (
-            <div key={item.label} className="flex items-center gap-1.5">
-              <span
-                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: item.color, boxShadow: `0 0 6px ${item.color}60` }}
-              />
-              <span className="text-[11px] text-gray-400">{item.label}</span>
-            </div>
-          ))}
+        <div className="flex gap-1.5 h-full items-end">
+          <button
+            onClick={expandAll}
+            className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors h-[28px]"
+            title="Expand all folders"
+          >
+            <Maximize2 className="h-3 w-3" /> Expand
+          </button>
+          <button
+            onClick={collapseAll}
+            className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors h-[28px]"
+            title="Collapse all folders"
+          >
+            <Minimize2 className="h-3 w-3" /> Collapse
+          </button>
+          <button
+            onClick={resetLayout}
+            className="flex items-center justify-center gap-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors h-[28px]"
+            title="Reset graph layout"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
         </div>
       </div>
     </div>
