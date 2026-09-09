@@ -4,3 +4,6 @@ parser/parser
 parser/json.hpp
 *.zip
 tmp/
+
+# Private working notes
+notes/
