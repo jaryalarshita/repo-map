@@ -23,7 +23,25 @@ const app = express();
 // 1. CORS — MUST be before any route definitions.
 //    Our React frontend runs on localhost:5173 (Vite default),
 //    our backend on localhost:3001. Without this, browsers block the requests.
-app.use(cors());
+//
+//    Restricted to an explicit allowlist (ALLOWED_ORIGINS, comma-separated) —
+//    a bare cors() allows every origin on the internet to drive this API from
+//    a visitor's browser, which is not safe for a publicly reachable server.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Allow requests with no Origin header (curl, server-to-server, health checks).
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    }
+  },
+}));
 
 // 2. Parse incoming JSON request bodies (needed for POST /api/analyze)
 app.use(express.json());

@@ -30,7 +30,6 @@ async function generateSummary(fileContent, filePath) {
   // Step 1: Check for API key
   // -------------------------------------------------------------------------
   const apiKey = process.env.DEEPMIND_API_KEY;
-  console.log('DEBUG API KEY:', apiKey);
 
   if (!apiKey || apiKey === 'your_key_here') {
     return 'Summary unavailable: API key not configured. Set DEEPMIND_API_KEY in .env';
