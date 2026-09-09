@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "=======================================================================",
+    "schema.json — Graph Data Schema for react-force-graph-3d",
+    "=======================================================================",
+    "This defines the exact JSON structure the React frontend expects.",
+    "",
+    "NODES: Each file in the repository becomes a node (a sphere in 3D).",
+    "  - id:      Relative file path — used as unique key. react-force-graph",
+    "             matches link.source/target to node.id to draw edges.",
+    "  - label:   Short filename shown as a floating label in 3D space.",
+    "  - size:    Visual sphere size. Scale by import count for 'heat map'.",
+    "  - summary: AI-generated description, populated on-click via Deepmind.",
+    "             Starts as null — filled lazily to avoid API rate limits.",
+    "",
+    "LINKS: Each import/require/#include creates a link (a 3D line/edge).",
+    "  - source:  The file that contains the import statement.",
+    "  - target:  The file being imported.",
+    "======================================================================="
+  ],
+  "nodes": [
+    {
+      "id": "src/index.js",
+      "label": "index.js",
+      "size": 15,
+      "summary": null
+    },
+    {
+      "id": "src/components/App.jsx",
+      "label": "App.jsx",
+      "size": 12,
+      "summary": null
+    },
+    {
+      "id": "src/utils/helpers.js",
+      "label": "helpers.js",
+      "size": 8,
+      "summary": null
+    }
+  ],
+  "links": [
+    {
+      "source": "src/index.js",
+      "target": "src/components/App.jsx"
+    },
+    {
+      "source": "src/components/App.jsx",
+      "target": "src/utils/helpers.js"
+    }
+  ]
+}
