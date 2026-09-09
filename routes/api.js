@@ -12,11 +12,26 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 
 const githubService = require('../services/githubService');
 const parserService = require('../services/parserService');
 const deepmindService = require('../services/deepmindService');
+
+// ── Rate limiting ────────────────────────────────────────────────────────────
+// /analyze and /analyze/stream are the expensive paths: each call downloads a
+// full repo ZIP from GitHub and walks its entire file tree. Without a limit,
+// one client can burn through GitHub's unauthenticated rate limit (60/hr) or
+// fill the server's disk with concurrent downloads. Lighter, frequently-polled
+// endpoints (ping, file-content, summary) are intentionally left unlimited.
+const analyzeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many analysis requests. Please wait before trying again.' },
+});
 
 // ── State: keep the last analyzed repo on disk so /file-content works ──
 let lastExtractedDir = null;
@@ -42,7 +57,7 @@ router.get('/analyze/ping', (req, res) => {
 });
 
 // ── SSE Stream: Download → Parse → Return ───────────────────────────────────
-router.get('/analyze/stream', async (req, res) => {
+router.get('/analyze/stream', analyzeLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -86,7 +101,7 @@ router.get('/analyze/stream', async (req, res) => {
 });
 
 // ── POST /api/analyze ───────────────────────────────────────────────────────
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', analyzeLimiter, async (req, res) => {
   const githubUrl = req.body.url;
   if (!githubUrl) {
     return res.status(400).json({ error: 'githubUrl is required. Send { "url": "https://github.com/owner/repo" }' });
@@ -112,6 +127,9 @@ router.post('/analyze', async (req, res) => {
     console.error(`[Analyze] ❌ Error: ${err.message}`);
     cleanupPrevious();
 
+    if (err.code === 413) {
+      return res.status(413).json({ error: err.message });
+    }
     if (err.message.includes('not found') || err.message.includes('private')) {
       return res.status(404).json({ error: err.message });
     }
@@ -135,7 +153,7 @@ router.get('/file-content', (req, res) => {
 
   // Prevent path traversal attacks
   const resolved = path.resolve(lastExtractedDir, relPath);
-  if (!resolved.startsWith(path.resolve(lastExtractedDir))) {
+  if (!resolved.startsWith(path.resolve(lastExtractedDir) + path.sep)) {
     return res.status(403).json({ error: 'Path traversal not allowed' });
   }
 
@@ -175,24 +193,23 @@ router.get('/summary', async (req, res) => {
     return res.status(400).json({ error: 'path query parameter is required' });
   }
 
-  // Try to read from the last extracted repo first
-  let fileContent;
-  if (lastExtractedDir) {
-    const resolved = path.resolve(lastExtractedDir, filePath);
-    if (resolved.startsWith(path.resolve(lastExtractedDir))) {
-      try {
-        fileContent = fs.readFileSync(resolved, 'utf-8');
-      } catch { /* fall through to fallback */ }
-    }
+  // Read only from inside the last extracted repo — never from an
+  // arbitrary/absolute path supplied by the client (that was a file-read
+  // vulnerability: ?path=/etc/passwd would previously be read and summarized).
+  if (!lastExtractedDir) {
+    return res.status(404).json({ error: 'No repository has been analyzed yet' });
   }
 
-  // Fallback to absolute path
-  if (!fileContent) {
-    try {
-      fileContent = fs.readFileSync(filePath, 'utf-8');
-    } catch {
-      return res.status(404).json({ error: `File not found: ${filePath}` });
-    }
+  const resolved = path.resolve(lastExtractedDir, filePath);
+  if (!resolved.startsWith(path.resolve(lastExtractedDir) + path.sep)) {
+    return res.status(403).json({ error: 'Path traversal not allowed' });
+  }
+
+  let fileContent;
+  try {
+    fileContent = fs.readFileSync(resolved, 'utf-8');
+  } catch {
+    return res.status(404).json({ error: `File not found: ${filePath}` });
   }
 
   const summary = await deepmindService.generateSummary(fileContent, filePath);

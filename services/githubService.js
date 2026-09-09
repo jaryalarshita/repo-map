@@ -21,6 +21,12 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
+// Hard cap on how large a repo ZIP we'll download. Without this, a request for
+// a very large repository buffers unbounded bytes into memory and disk, which
+// can crash the process or fill the disk. axios aborts the download as soon as
+// this many bytes have arrived, rather than downloading the whole thing first.
+const MAX_REPO_BYTES = Number(process.env.MAX_REPO_BYTES) || 150 * 1024 * 1024; // 150 MB
+
 /**
  * Downloads a GitHub repo as a .zip and extracts it locally.
  *
@@ -61,14 +67,31 @@ async function downloadAndExtract(githubUrl) {
         responseType: 'arraybuffer',
         headers: {
           'User-Agent': 'CodebaseMap-Hackathon', // GitHub API requires a User-Agent
-          'Accept': 'application/vnd.github+json'
+          'Accept': 'application/vnd.github+json',
+          ...(process.env.GITHUB_TOKEN
+            ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+            : {}),
         },
-        maxRedirects: 5 // GitHub redirects to a CDN URL for the actual download
+        maxRedirects: 5, // GitHub redirects to a CDN URL for the actual download
+        // Abort the download once it exceeds MAX_REPO_BYTES instead of
+        // buffering the whole archive into memory first.
+        maxContentLength: MAX_REPO_BYTES,
+        maxBodyLength: MAX_REPO_BYTES,
       }
     );
   } catch (err) {
     if (err.response && err.response.status === 404) {
       throw new Error('Repository not found or is private');
+    }
+    if (
+      err.code === 'ERR_FR_MAX_CONTENT_LENGTH_EXCEEDED' ||
+      /maxContentLength|maxBodyLength/i.test(err.message || '')
+    ) {
+      const sizeError = new Error(
+        `Repository is too large to analyze (limit: ${(MAX_REPO_BYTES / 1024 / 1024).toFixed(0)} MB).`
+      );
+      sizeError.code = 413;
+      throw sizeError;
     }
     throw new Error(`GitHub download failed: ${err.message}`);
   }
@@ -144,7 +167,10 @@ async function fetchFileContent(githubUrl, filePath) {
       {
         headers: {
           'User-Agent': 'CodebaseMap-Hackathon',
-          'Accept': 'application/vnd.github.v3.raw'
+          'Accept': 'application/vnd.github.v3.raw',
+          ...(process.env.GITHUB_TOKEN
+            ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+            : {}),
         },
         responseType: 'text',
         transformResponse: [(data) => data] // Prevent axios from auto-parsing JSON
